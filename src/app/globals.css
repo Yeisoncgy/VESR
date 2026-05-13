@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+:root {
+  --background: #07070a;
+  --surface: #0e0e13;
+  --surface-2: #14141c;
+  --border: #1d1d28;
+  --foreground: #ededed;
+  --muted: #8a8a99;
+  --cyan: #00f0ff;
+  --magenta: #ff2bb5;
+  --cyan-dim: rgba(0, 240, 255, 0.35);
+  --magenta-dim: rgba(255, 43, 181, 0.35);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-cyan: var(--cyan);
+  --color-magenta: var(--magenta);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-image:
+    radial-gradient(1200px 600px at 10% -10%, rgba(0, 240, 255, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 100% 110%, rgba(255, 43, 181, 0.08), transparent 60%);
+  background-attachment: fixed;
+}
+
+.neon-text-cyan {
+  color: var(--cyan);
+  text-shadow:
+    0 0 8px var(--cyan-dim),
+    0 0 20px var(--cyan-dim);
+}
+
+.neon-text-magenta {
+  color: var(--magenta);
+  text-shadow:
+    0 0 8px var(--magenta-dim),
+    0 0 20px var(--magenta-dim);
+}
+
+.neon-border-cyan {
+  border-color: var(--cyan);
+  box-shadow:
+    0 0 0 1px var(--cyan-dim),
+    0 0 20px -4px var(--cyan-dim),
+    inset 0 0 12px -6px var(--cyan-dim);
+}
+
+.neon-border-magenta {
+  border-color: var(--magenta);
+  box-shadow:
+    0 0 0 1px var(--magenta-dim),
+    0 0 20px -4px var(--magenta-dim),
+    inset 0 0 12px -6px var(--magenta-dim);
+}
+
+.surface-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.0)) , var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 20px -4px var(--cyan-dim),
+      0 0 60px -10px var(--cyan-dim);
+  }
+  50% {
+    box-shadow:
+      0 0 30px -2px var(--cyan-dim),
+      0 0 90px -8px var(--cyan-dim);
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2.4s ease-in-out infinite;
+}
+
+@keyframes bar-wave {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
+.bar {
+  display: inline-block;
+  width: 4px;
+  background: linear-gradient(180deg, var(--cyan), var(--magenta));
+  border-radius: 2px;
+  transform-origin: bottom center;
+}
+
+input::selection,
+::selection {
+  background: var(--cyan);
+  color: black;
+}
+
+/* hide default scrollbars inside player containers */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
