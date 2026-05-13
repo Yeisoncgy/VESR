@@ -76,7 +76,18 @@ export function useRoomSync({
     controlsRef.current = controls;
   }, [controls]);
   useEffect(() => {
+    const wasArmed = armedRef.current;
     armedRef.current = armed;
+    // When user becomes armed (gesture happened), re-request state from peers
+    // so we can catch up with what they're playing.
+    if (!wasArmed && armed && channelRef.current) {
+      const req: SyncEvent = { type: "state-request", from: peerId };
+      channelRef.current.send({
+        type: "broadcast",
+        event: BROADCAST_EVENT,
+        payload: req,
+      });
+    }
   }, [armed]);
   useEffect(() => {
     clockRef.current = clockSync;
@@ -105,12 +116,18 @@ export function useRoomSync({
     if (!ctrl) return;
     if (!armedRef.current) {
       // We haven't received user gesture yet. Mobile browsers will reject
-      // programmatic play(). We still apply pause/seek which don't need gestures.
+      // programmatic play(). We still apply pause/seek/state which don't need gestures.
       if (evt.type === "pause") {
         await ctrl.pause();
         await ctrl.seekTo(evt.position);
       } else if (evt.type === "seek") {
         await ctrl.seekTo(evt.position);
+      } else if (evt.type === "state") {
+        // Late-join while not yet armed: seek to host's position so that when
+        // the user gestures (taps "Estoy listo" or play), they start from the right spot.
+        const elapsedServer = nowServer(clockRef.current) - evt.serverAt;
+        const targetPosition = evt.position + (evt.playing ? elapsedServer / 1000 : 0);
+        await ctrl.seekTo(Math.max(0, targetPosition));
       }
       return;
     }
@@ -159,8 +176,10 @@ export function useRoomSync({
         break;
       }
       case "state-request": {
-        // Another peer asked for current state. Respond if we're playing.
+        // Another peer asked for current state. Only respond if we're armed
+        // (otherwise our position is 0 and isPlaying is false — useless).
         if (!controlsRef.current) return;
+        if (!armedRef.current) return;
         const pos = await controlsRef.current.getCurrentTime();
         const channel = channelRef.current;
         if (!channel) return;

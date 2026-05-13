@@ -114,8 +114,14 @@ export function RoomView({
         return;
       }
 
-      // Auto-arm: si el usuario le da play directo al iframe, ya hizo gesture
-      if (!armed) setArmed(true);
+      // Auto-arm: si el usuario le da play directo al iframe, ya hizo gesture.
+      // Esto también marca al peer como "listo" en Supabase para que el sync funcione.
+      if (!armed) {
+        setArmed(true);
+        if (sync.configured) {
+          await sync.setReady(true);
+        }
+      }
 
       // Si está en sync con compa, propagar
       if (sync.configured && bothReady) {
