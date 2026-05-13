@@ -31,6 +31,8 @@ export function RoomView({
   const [copied, setCopied] = useState(false);
   const [showPlayer, setShowPlayer] = useState(false);
   const stateRef = useRef<PlaybackState>("loading");
+  // Flag para suprimir broadcasts cuando el cambio de estado vino de un evento remoto o programático
+  const suppressBroadcastRef = useRef(false);
 
   useEffect(() => {
     stateRef.current = state;
@@ -44,11 +46,18 @@ export function RoomView({
     return {
       play: async () => {
         const p = playerRef.current;
-        if (p) await p.play();
+        if (p) {
+          // Marca para que el evento "playing" del iframe no rebote como broadcast
+          suppressBroadcastRef.current = true;
+          await p.play();
+        }
       },
       pause: async () => {
         const p = playerRef.current;
-        if (p) await p.pause();
+        if (p) {
+          suppressBroadcastRef.current = true;
+          await p.pause();
+        }
       },
       seekTo: async (s: number) => {
         const p = playerRef.current;
@@ -83,20 +92,45 @@ export function RoomView({
   }, [armed]);
 
   const handleReady = useCallback(() => setState("ready"), []);
-  const handleStateChange = useCallback(
-    (next: "playing" | "paused" | "ended") => {
-      if (next === "playing") setState("playing");
-      else setState("paused");
-    },
-    [],
-  );
 
   const ready = sync.peers.find((p) => p.id === sync.selfId)?.ready ?? false;
   const others = sync.peers.filter((p) => p.id !== sync.selfId);
   const otherReady = others.some((p) => p.ready);
   const bothPresent = others.length > 0;
   const bothReady = ready && otherReady;
-  const canControl = !sync.configured ? armed : bothReady && armed;
+  // Controles VESR siempre habilitados una vez que el player carga.
+  // El broadcast solo ocurre si ambos están listos.
+  const canControl = state !== "loading";
+
+  // Detecta play/pause del iframe nativo y broadcastea si corresponde
+  const handleStateChange = useCallback(
+    async (next: "playing" | "paused" | "ended") => {
+      if (next === "playing") setState("playing");
+      else setState("paused");
+
+      // Si el evento vino de aplicar un evento remoto, no rebroadcastees
+      if (suppressBroadcastRef.current) {
+        suppressBroadcastRef.current = false;
+        return;
+      }
+
+      // Auto-arm: si el usuario le da play directo al iframe, ya hizo gesture
+      if (!armed) setArmed(true);
+
+      // Si está en sync con compa, propagar
+      if (sync.configured && bothReady) {
+        const p = playerRef.current;
+        if (!p) return;
+        const pos = await p.getCurrentTime();
+        if (next === "playing") {
+          await sync.broadcastPlay(pos, 1500);
+        } else if (next === "paused") {
+          await sync.broadcastPause(pos);
+        }
+      }
+    },
+    [armed, sync, bothReady],
+  );
 
   const handleArm = useCallback(async () => {
     setArmed(true);
@@ -107,6 +141,7 @@ export function RoomView({
         await p.pause();
         await p.seekTo(0);
         setPosition(0);
+        suppressBroadcastRef.current = false;
       } catch {
         /* ignore */
       }
@@ -121,9 +156,12 @@ export function RoomView({
     if (!p) return;
     const pos = await p.getCurrentTime();
     if (sync.configured && bothReady) {
+      // Suprime el rebroadcast del evento 'playing' que dispare el iframe
+      suppressBroadcastRef.current = true;
       await sync.broadcastPlay(pos, 1500);
       setTimeout(() => p.play(), 1500);
     } else {
+      suppressBroadcastRef.current = true;
       await p.play();
     }
   }, [sync, bothReady]);
@@ -135,6 +173,7 @@ export function RoomView({
     if (sync.configured && bothReady) {
       await sync.broadcastPause(pos);
     }
+    suppressBroadcastRef.current = true;
     await p.pause();
   }, [sync, bothReady]);
 
@@ -200,14 +239,10 @@ export function RoomView({
     return { tone: "muted" as const, text: "Esperando compañía" };
   })();
 
+  // Si no está armado: pedimos "Estoy listo" como CTA. Si lo está, mostramos transport completo.
   const primaryCta = (() => {
-    if (state === "loading") return { label: "Cargando…", action: undefined, disabled: true, variant: "magenta" as const };
-    if (!armed) return { label: "Estoy listo", action: handleArm, disabled: false, variant: "magenta" as const };
-    if (!sync.configured) return null;
-    if (!bothPresent)
-      return { label: "Esperando que entre tu compa", action: undefined, disabled: true, variant: "magenta" as const };
-    if (!otherReady)
-      return { label: "Esperando que esté listo", action: undefined, disabled: true, variant: "magenta" as const };
+    if (state === "loading") return { label: "Cargando…", action: undefined, disabled: true };
+    if (!armed) return { label: "Estoy listo", action: handleArm, disabled: false };
     return null;
   })();
 
@@ -551,38 +586,57 @@ export function RoomView({
             {primaryCta.label}
           </button>
         ) : (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 22,
-              marginBottom: 4,
-            }}
-          >
-            <RoundBtn
-              size={52}
-              dim={!canControl}
-              onClick={() => handleSeek(Math.max(0, position - 10))}
-              ariaLabel="Atrás 10 segundos"
-              disabled={!canControl}
+          <>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 22,
+                marginBottom: 8,
+              }}
             >
-              −10s
-            </RoundBtn>
-            <PlayButton
-              isPlaying={isPlaying}
-              onClick={isPlaying ? handlePause : handlePlay}
-              disabled={!canControl}
-            />
-            <RoundBtn
-              size={52}
-              dim={!canControl}
-              onClick={() => handleSeek(Math.min(duration, position + 10))}
-              ariaLabel="Adelante 10 segundos"
-              disabled={!canControl}
-            >
-              +10s
-            </RoundBtn>
-          </div>
+              <RoundBtn
+                size={52}
+                dim={!canControl}
+                onClick={() => handleSeek(Math.max(0, position - 10))}
+                ariaLabel="Atrás 10 segundos"
+                disabled={!canControl}
+              >
+                −10s
+              </RoundBtn>
+              <PlayButton
+                isPlaying={isPlaying}
+                onClick={isPlaying ? handlePause : handlePlay}
+                disabled={!canControl}
+              />
+              <RoundBtn
+                size={52}
+                dim={!canControl}
+                onClick={() => handleSeek(Math.min(duration, position + 10))}
+                ariaLabel="Adelante 10 segundos"
+                disabled={!canControl}
+              >
+                +10s
+              </RoundBtn>
+            </div>
+            {sync.configured && !bothReady && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: "var(--muted)",
+                  textAlign: "center",
+                  marginTop: 6,
+                  lineHeight: 1.5,
+                }}
+              >
+                {!bothPresent
+                  ? "Le das play y suena solo aquí · Comparte la sala para sincronizar"
+                  : !otherReady
+                  ? "Tu compa entró pero no marcó listo todavía"
+                  : "Listos para arrancar juntos"}
+              </div>
+            )}
+          </>
         )}
 
         {/* Status pill */}
