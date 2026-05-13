@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SYNC — Escucha música al tiempo",
+  title: "VESR — Escucha música al tiempo",
   description: "Comparte un set y escúchenlo sincronizado con un amigo, cada uno en su dispositivo.",
 };
 

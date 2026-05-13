@@ -10,7 +10,7 @@ export default function Home() {
             beta · solo para yeison & jafet
           </div>
           <h1 className="text-5xl sm:text-7xl font-black tracking-tight">
-            <span className="neon-text-cyan">SYNC</span>
+            <span className="neon-text-cyan">VESR</span>
             <span className="text-[var(--foreground)]">.</span>
           </h1>
           <p className="mt-4 text-[var(--muted)] text-sm sm:text-base leading-relaxed">

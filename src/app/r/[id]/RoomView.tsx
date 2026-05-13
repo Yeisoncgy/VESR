@@ -160,7 +160,7 @@ export function RoomView({
             href="/"
             className="text-[10px] uppercase tracking-[0.25em] text-[var(--muted)] hover:text-[var(--cyan)] transition-colors"
           >
-            ← SYNC
+            ← VESR
           </a>
           <div className="flex items-center gap-3">
             <PresenceDot sync={sync} bothPresent={bothPresent} otherReady={otherReady} />
